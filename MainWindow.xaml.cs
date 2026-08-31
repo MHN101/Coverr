@@ -1,63 +1,124 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using Windows.Media.Control;
 
 namespace Coverr
 {
     public partial class MainWindow : Window
     {
-        private DispatcherTimer _timer;
+        private GlobalSystemMediaTransportControlsSessionManager? _smtcManager;
+        private GlobalSystemMediaTransportControlsSession? _currentSession;
+        private string? _lastTrackKey;
 
         public MainWindow()
         {
             InitializeComponent();
-            
-            // Check for track changes every 2 seconds
-            _timer = new DispatcherTimer();
-            _timer.Interval = TimeSpan.FromSeconds(2);
-            _timer.Tick += (s, e) => UpdateCoverArt();
-            _timer.Start();
-            
+            InitializeSmtc();
+        }
+
+        private async void InitializeSmtc()
+        {
+            try
+            {
+                _smtcManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+                _smtcManager.CurrentSessionChanged += OnCurrentSessionChanged;
+
+                // Hook into the initial session, if any
+                AttachSession(_smtcManager.GetCurrentSession());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Coverr] SMTC init failed: {ex}");
+            }
+        }
+
+        private void OnCurrentSessionChanged(
+            GlobalSystemMediaTransportControlsSessionManager sender,
+            CurrentSessionChangedEventArgs args)
+        {
+            AttachSession(sender.GetCurrentSession());
+        }
+
+        private void AttachSession(GlobalSystemMediaTransportControlsSession? session)
+        {
+            // Unsubscribe from the old session
+            if (_currentSession != null)
+                _currentSession.MediaPropertiesChanged -= OnMediaPropertiesChanged;
+
+            _currentSession = session;
+            _lastTrackKey = null; // force reload for the new session
+
+            if (_currentSession != null)
+            {
+                _currentSession.MediaPropertiesChanged += OnMediaPropertiesChanged;
+                // Fetch cover art immediately for the new session
+                UpdateCoverArt();
+            }
+            else
+            {
+                // No active session — clear the display
+                Dispatcher.Invoke(() =>
+                {
+                    CoverArtImage.Source = null;
+                    BackgroundImage.Source = null;
+                });
+            }
+        }
+
+        private void OnMediaPropertiesChanged(
+            GlobalSystemMediaTransportControlsSession sender,
+            MediaPropertiesChangedEventArgs args)
+        {
+            // Called only when the playing track actually changes
             UpdateCoverArt();
         }
 
         private async void UpdateCoverArt()
         {
-            try 
+            try
             {
-                var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                var session = manager.GetCurrentSession();
+                if (_currentSession == null) return;
 
-                if (session != null)
+                var mediaProperties = await _currentSession.TryGetMediaPropertiesAsync();
+                if (mediaProperties?.Thumbnail == null) return;
+
+                // Skip the expensive decode if the same track is still playing
+                var trackKey = $"{mediaProperties.Artist}|{mediaProperties.Title}";
+                if (trackKey == _lastTrackKey) return;
+                _lastTrackKey = trackKey;
+
+                using var winrtStream = await mediaProperties.Thumbnail.OpenReadAsync();
+                using var dotNetStream = winrtStream.AsStream();
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.StreamSource = dotNetStream;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+
+                // Marshal back to the UI thread
+                Dispatcher.Invoke(() =>
                 {
-                    var mediaProperties = await session.TryGetMediaPropertiesAsync();
-                    if (mediaProperties.Thumbnail != null)
-                    {
-                        using var winrtStream = await mediaProperties.Thumbnail.OpenReadAsync();
-                        using var dotNetStream = winrtStream.AsStream();
-
-                        var bitmap = new BitmapImage();
-                        bitmap.BeginInit();
-                        bitmap.StreamSource = dotNetStream;
-                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmap.EndInit();
-                        bitmap.Freeze();
-
-                        CoverArtImage.Source = bitmap;
-                        BackgroundImage.Source = bitmap;
-                    }
-                }
+                    CoverArtImage.Source = bitmap;
+                    BackgroundImage.Source = bitmap;
+                });
             }
-            catch { /* Ignore errors if no media is playing */ }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Coverr] UpdateCoverArt failed: {ex}");
+            }
         }
 
         private void Window_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            this.WindowState = this.WindowState == WindowState.Normal ? WindowState.Maximized : WindowState.Normal;
+            this.WindowState = this.WindowState == WindowState.Normal
+                ? WindowState.Maximized
+                : WindowState.Normal;
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
