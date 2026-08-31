@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Launch (SharpDbg)",
+            "type": "sharpdbg",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "projectPath": "${workspaceFolder}/Coverr.csproj",
+            "stopAtEntry": false
+        },
+        {
+            "name": ".NET Attach (SharpDbg)",
+            "type": "sharpdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
+        }
+    ]
+}

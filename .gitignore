@@ -1,0 +1,24 @@
+# Build and Output Folders
+bin/
+obj/
+publish/
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+
+# Visual Studio & User files
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# VS Code
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store

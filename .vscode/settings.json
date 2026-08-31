@@ -1,0 +1,5 @@
+{
+    "dotnet.defaultSolution": "Coverr.sln",
+    "dotnet.preferCSharpExtension": true,
+    "csharp.suppressDotnetRestoreNotification": true
+}

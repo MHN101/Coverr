@@ -1,0 +1,40 @@
+<Window x:Class="Coverr.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cover Art Widget" Height="400" Width="400"
+        WindowStyle="None" 
+        AllowsTransparency="True" 
+        Background="Black"
+        MouseDoubleClick="Window_MouseDoubleClick"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        Topmost="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome ResizeBorderThickness="5" CaptionHeight="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid ClipToBounds="True" Background="Black">
+        <!-- Blurred ambient background -->
+        <Image x:Name="BackgroundImage" 
+               Stretch="UniformToFill" 
+               RenderOptions.BitmapScalingMode="HighQuality"
+               RenderTransformOrigin="0.5,0.5">
+            <Image.RenderTransform>
+                <ScaleTransform ScaleX="1.2" ScaleY="1.2"/>
+            </Image.RenderTransform>
+            <Image.Effect>
+                <BlurEffect Radius="60" KernelType="Gaussian" RenderingBias="Quality"/>
+            </Image.Effect>
+        </Image>
+
+        <!-- Dark overlay for contrast -->
+        <Rectangle Fill="#50000000" />
+
+        <!-- Crisp foreground album cover art -->
+        <Image x:Name="CoverArtImage" 
+               Stretch="Uniform" 
+               HorizontalAlignment="Center" 
+               VerticalAlignment="Center"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+    </Grid>
+</Window>
